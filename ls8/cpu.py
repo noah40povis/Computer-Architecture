@@ -2,25 +2,39 @@
 
 import sys
 
-LDI = 0b10000010
-PRN = 0b01000111
-HLT = 0b00000001
-MUL = 0b10100010
+HLT = 0b00000001 # stop
+LDI = 0b10000010 # sets a specified register to a value
+PRN = 0b01000111 # print
+ADD = 0b10100000 # add
+SUB = 0b10100001 # subtract
+MUL = 0b10100010 # multiply
+PUSH = 0b01000101 # push onto the stack
+POP = 0b01000110 # pop off the stack
+CALL = 0b01010000 # call
+RET = 0b00010001 # return
+CMP = 0b10100111 # compare
+JMP = 0b01010100 # jump
+JEQ = 0b01010101 # equal
+JNE = 0b01010110 # not equal
 
 class CPU:
     """Main CPU class."""
 
     def __init__(self):
         """Construct a new CPU."""
-        self.ram = [0] * 256 
-        self.registers = [0] * 8 #r0-r7 
-        self.pc = 0 #PROGRAM Counter, address of the currently executing instruction 
+        self.ram = [0] * 256 # ram 
+        self.reg = [0] * 8 # temp value holder 
+        self.pc = 0 #program counter 
+        self.sp = 7 #stack pointer 
+        self.running = True
+        self.flag = 0b00000000 #marker used for comparison  
+        #PROGRAM Counter, address of the currently executing instruction 
                     #accept the address to read and return the value stored there. 
     #variables in hardware. known as "registers"
     # there are a fixed number of reigsters 
     #they have fixed names 
     # r0, r1, r2,....r6, r7 
-    
+
     #accepts the address to read and return the value stored there. 
     def ram_read(self, address):
         return self.ram[address]
@@ -32,53 +46,42 @@ class CPU:
          
 
     def load(self, filename):
-        """Load a program into memory."""
-        # address = 0
-        # # For now, we've just hardcoded a program:
-        # program = [
-        #     # From print8.ls8
-        #     0b10000010, # LDI R0,8
-        #     0b00000000,
-        #     0b00001000,
-        #     0b01000111, # PRN R0
-        #     0b00000000,
-        #     0b00000001, # HLT
-        # ]
-        # for instruction in program:
-        #     self.ram[address] = instruction
-        #     address += 1
-        try:    
-            address = 0
-            with open(sys.argv[1]) as file:
-                for line in file:
-                    split_file = line.split("#")
-                    value = split_file[0].strip()
-                    if value == "":
-                        continue
+        with open(filename, "r") as file:
+            address = 0 
+            for line in file:
+                split_file = line.split("#")[0].strip()
+                if split_file  == "":
+                    continue
+                self.ram[address] = int(split_file, 2)
+                address += 1
 
-                    try:
-                        instruction = int(value, 2)
-                    except ValueError:
-                        print(f"Invalid number '{n}'")
-                        sys.exit(1)
 
-                    self.ram[address] = instruction
-                    address += 1
-
-        except FileNotFoundError:
-            print(f"{sys.argv[0]} {sys.argv[1]} file not found")
-            sys.exit()
-
-    def alu(self, op, reg_a, reg_b):
+    def alu(self, op, reg_a, reg_b): #math operations 
         """ALU operations."""
-
+    #were going to put two numbers in the register and compare them 
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
         #elif op == "SUB": etc
+        #subtract 
+        elif op == "SUB":
+            self.reg[reg_a] -= self.reg[reg_b]
+        #multiply 
+        elif op == 'MUL':
+            self.reg[reg_a] *= self.reg[reg_b]
+        #compare 
+        elif op == "CMP":
+            if self.reg[reg_a] == self.reg[reg_b]:
+                self.flag = 0b00000001
+               
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.flag = 0b00000010
+
+            elif self.reg[reg_a] < self.reg[reg_b]:
+                self.flag = 0b000000100
         else:
             raise Exception("Unsupported ALU operation")
-
-    def trace(self):
+    
+    def trace(self): #read back the last things that were run 
         """
         Handy function to print out the CPU state. You might want to call this
         from run() if you need help debugging.
@@ -109,17 +112,52 @@ class CPU:
 
             if instruction_register == HLT: #halt the cpu and exit the emulator 
                 self.running = False
-
+            elif instruction_register == ADD:
+                self.alu("ADD", operand_a, operand_b)
+                self.pc += 3
+            elif instruction_register == SUB:
+                self.alu("SUB", operand_a, operand_b)
+                self.pc += 3
             elif instruction_register == PRN: #print numericc value stored in the given register 
-                print(self.registers[operand_a])
+                print(self.reg[operand_a])
                 self.pc += 2   
             elif instruction_register == LDI: #set the value of the register to an integer 
-                self.registers[operand_a] = operand_b
+                self.reg[operand_a] = operand_b
                 self.pc += 3
             elif instruction_register == MUL:
-                reg_a = self.ram_read(self.pc + 1)
-                reg_b = self.ram_read(self.pc + 2)
-                self.registers[reg_a] = self.registers[reg_a] * self.registers[reg_b]
+                self.alu("MUL", operand_a, operand_b)
+                self.pc += 3 
+            elif instruction_register == CMP:
+                self.alu("CMP", operand_a, operand_b)
                 self.pc += 3
-
-
+            elif instruction_register == JMP:
+                self.pc = self.reg[operand_a]
+            elif instruction_register == JEQ:
+                if self.flag == 0b00000001:
+                    self.pc = self.reg[operand_a]
+                else:
+                    self.pc += 2
+            elif instruction_register == JNE:
+                if self.flag != 0b00000001:
+                    self.pc = self.reg[operand_a]
+                else:
+                    self.pc += 2
+            elif instruction_register == PUSH:
+                self.reg[self.sp] -= 1
+                self.ram_write(self.reg[operand_a], self.reg[self.sp]) 
+                self.pc += 2
+            elif instruction_register == POP:
+                self.reg[operand_a] = self.ram_read(self.reg[self.sp])
+                self.reg[self.sp] += 1
+                self.pc += 2
+            elif instruction_register == CALL:
+                self.reg[self.sp] -= 1
+                self.ram_write(self.pc + 2, self.reg[self.sp])
+                self.pc = self.reg[operand_a]
+            elif instruction_register == RET:
+                self.pc = self.ram_read(self.reg[self.sp])
+                self.reg[self.sp] += 1 
+            else:
+                print("Instruction not valid")
+        
+            
