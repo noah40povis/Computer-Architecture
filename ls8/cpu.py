@@ -71,13 +71,13 @@ class CPU:
         #compare 
         elif op == "CMP":
             if self.reg[reg_a] == self.reg[reg_b]:
-                self.flag = 0b00000001
+                self.flag = 0b00000001 #equals place pay attention to the 1 
                
             elif self.reg[reg_a] > self.reg[reg_b]:
-                self.flag = 0b00000010
+                self.flag = 0b00000010 # Greater than place
 
             elif self.reg[reg_a] < self.reg[reg_b]:
-                self.flag = 0b000000100
+                self.flag = 0b000000100 # less-then place 
         else:
             raise Exception("Unsupported ALU operation")
     
